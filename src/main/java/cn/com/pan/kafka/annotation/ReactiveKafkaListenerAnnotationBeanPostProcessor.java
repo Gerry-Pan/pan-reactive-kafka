@@ -37,6 +37,7 @@ import org.springframework.util.StringUtils;
 
 import cn.com.pan.kafka.config.ReactiveMethodKafkaListenerEndpoint;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.FluxProcessor;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.TopicProcessor;
 import reactor.kafka.receiver.KafkaReceiver;
@@ -62,14 +63,23 @@ public class ReactiveKafkaListenerAnnotationBeanPostProcessor
 
 	private final List<ReactiveMethodKafkaListenerEndpoint> endpointList = new ArrayList<ReactiveMethodKafkaListenerEndpoint>();
 
-	private final TopicProcessor<ReceiverRecord<String, String>> kafkaProcessor = TopicProcessor
-			.create("kafkaProcessor", Queues.SMALL_BUFFER_SIZE);
+	private FluxProcessor<ReceiverRecord<? extends Object, ? extends Object>, ReceiverRecord<? extends Object, ? extends Object>> kafkaProcessor = null;
 
 	private Map<String, Object> consumerProperties = null;
 
 	public ReactiveKafkaListenerAnnotationBeanPostProcessor(Map<String, Object> consumerProperties) {
 		Assert.notNull(consumerProperties, "consumerProperties must not be null.");
 		this.consumerProperties = consumerProperties;
+		this.kafkaProcessor = TopicProcessor.create("kafkaProcessor", Queues.SMALL_BUFFER_SIZE);
+	}
+
+	public ReactiveKafkaListenerAnnotationBeanPostProcessor(Map<String, Object> consumerProperties,
+			FluxProcessor<ReceiverRecord<? extends Object, ? extends Object>, ReceiverRecord<? extends Object, ? extends Object>> kafkaProcessor) {
+		Assert.notNull(consumerProperties, "consumerProperties must not be null.");
+		Assert.notNull(kafkaProcessor, "kafkaProcessor must not be null.");
+
+		this.consumerProperties = consumerProperties;
+		this.kafkaProcessor = kafkaProcessor;
 	}
 
 	@Override
@@ -139,7 +149,8 @@ public class ReactiveKafkaListenerAnnotationBeanPostProcessor
 		return bean;
 	}
 
-	protected ReactiveMethodKafkaListenerEndpoint handleMapping(ReceiverRecord<String, String> receiverRecord) {
+	protected ReactiveMethodKafkaListenerEndpoint handleMapping(
+			ReceiverRecord<? extends Object, ? extends Object> receiverRecord) {
 		try {
 			String topic = receiverRecord.topic();
 			int partition = receiverRecord.partition();
@@ -202,7 +213,6 @@ public class ReactiveKafkaListenerAnnotationBeanPostProcessor
 		});
 
 		Flux.from(kafkaProcessor.replay(0).autoConnect()).map(receiverRecord -> {
-			System.out.println(receiverRecord);
 			ReactiveMethodKafkaListenerEndpoint endpoint = handleMapping(receiverRecord);
 
 			if (endpoint == null || endpoint.getMethod() == null || endpoint.getBean() == null) {
