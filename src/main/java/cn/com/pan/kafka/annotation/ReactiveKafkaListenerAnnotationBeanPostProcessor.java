@@ -212,7 +212,7 @@ public class ReactiveKafkaListenerAnnotationBeanPostProcessor
 			e.printStackTrace();
 		});
 
-		Flux.from(kafkaProcessor.replay(0).autoConnect()).map(receiverRecord -> {
+		Flux.from(kafkaProcessor.replay(0).autoConnect()).flatMap(receiverRecord -> {
 			ReactiveMethodKafkaListenerEndpoint endpoint = handleMapping(receiverRecord);
 
 			if (endpoint == null || endpoint.getMethod() == null || endpoint.getBean() == null) {
@@ -247,7 +247,7 @@ public class ReactiveKafkaListenerAnnotationBeanPostProcessor
 			}
 
 			if (invoke instanceof Flux) {
-				return ((Flux<Object>) invoke).next().onErrorResume(e -> {
+				return ((Flux<Object>) invoke).onErrorResume(e -> {
 					e.printStackTrace();
 					return Mono.empty();
 				});
